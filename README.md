@@ -1,7 +1,6 @@
+# BladeRunner Project
 
-# Blade Runner
-
-This project simulates a carriage control system using an Arduino. It includes multiple modules for handling different aspects of the system, such as controlling the carriage, processing commands, managing Wi-Fi connections, logging events, and running tests.
+This project simulates a carriage control system using an Arduino, part of the BladeRunner project. It includes multiple modules for handling different aspects of the system, such as controlling the carriage, processing commands, managing Wi-Fi connections, logging events, and running tests.
 
 ## Table of Contents
 
@@ -44,7 +43,7 @@ The project is split into several files for modularity:
 1. **Clone or Download the Project:**
    - Clone this repository using Git:
      ```bash
-     git clone https://github.com/your-username/carriage-system.git
+     git clone https://github.com/Wasif-ZA/BladeRunner.git
      ```
    - Or download the project as a ZIP file and extract it.
 
@@ -98,3 +97,4 @@ Once the code is uploaded to the Arduino, the program will:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
