@@ -142,5 +142,3 @@ To verify that JSON processing works correctly in your project:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-By following these updated steps, you will be able to run the Java components of the BladeRunner project, integrating the ESP32 for carriage control and networking.
