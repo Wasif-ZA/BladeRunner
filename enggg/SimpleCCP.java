@@ -179,52 +179,45 @@ public class SimpleCCP {
     // Method to flash the BR status LED
     // Method to control LED flashing for each state
     private void updateLEDState() {
-        // Stop any ongoing flashing before starting a new LED pattern
-        stopLEDFlashing();
-    
         switch (stateManager.getCurrentState()) {
             case STARTED:
-                flashLEDPattern(0, 5);  // LED 0 flashes 5 times to indicate STARTED
+                flashLEDPattern(0); // LED 0 flashes to indicate STARTED
                 break;
             case CONNECTED:
-                flashLEDPattern(1, 3);  // LED 1 flashes 3 times to indicate CONNECTED
+                flashLEDPattern(1); // LED 1 flashes to indicate CONNECTED
                 break;
             case FULL_SPEED:
-                turnOnLED(2);  // LED 2 stays ON to indicate full speed
+                turnOnLED(2); // LED 2 stays ON to indicate full speed
                 break;
             case MAINTAINING_PACE:
-                flashLEDPattern(3, 4);  // LED 3 flashes 4 times to indicate maintaining pace
+                flashLEDPattern(3); // LED 3 flashes to indicate maintaining pace
                 break;
             case STOPPED:
-                turnOnLED(0);  // LED 0 stays ON to indicate stopped state
+                turnOnLED(0); // LED 0 stays ON to indicate stopped state
                 break;
             case SLOW_FORWARD:
             case SLOW_BACKWARD:
-                flashLEDPattern(2, 6);  // LED 2 flashes 6 times for slow movement
+                flashLEDPattern(2); // LED 2 flashes for slow movement
                 break;
         }
     }
-    
+
 // Helper method to flash specific LED in a pattern 
-private void flashLEDPattern(int ledIndex, int flashCount) {
-    System.out.println("Flashing LED " + ledIndex);
-    isLEDFlashing = true;
-    final int[] counter = {0};  // Counter to limit flashes
+    private void flashLEDPattern(int ledIndex) {
+        System.out.println("Flashing LED " + ledIndex);
+        isLEDFlashing = true;
 
-    ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-    executor.scheduleAtFixedRate(() -> {
-        if (isLEDFlashing && counter[0] < flashCount) {
-            System.out.println("LED " + ledIndex + " ON");
-            sleep(500); // LED ON for 0.5 seconds
-            System.out.println("LED " + ledIndex + " OFF");
-            counter[0]++;  // Increment counter after each cycle
-        } else {
-            isLEDFlashing = false;  // Stop flashing after flashCount
-            executor.shutdown();    // Shutdown the executor
-        }
-    }, 0, 1000, TimeUnit.MILLISECONDS); // Flash every 1 second (ON/OFF cycle takes 1 second)
-}
-
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+        executor.scheduleAtFixedRate(() -> {
+            if (isLEDFlashing) {
+                System.out.println("LED " + ledIndex + " ON");
+                sleep(500); // LED ON for 0.5 seconds
+                System.out.println("LED " + ledIndex + " OFF");
+            } else {
+                executor.shutdown();
+            }
+        }, 0, 500, TimeUnit.MILLISECONDS);
+    }
 
 // Helper method to turn on specific LED
     private void turnOnLED(int ledIndex) {
