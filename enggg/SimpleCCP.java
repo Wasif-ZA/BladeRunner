@@ -16,11 +16,17 @@ public class SimpleCCP {
     private boolean isCarriageBehind;
     private boolean isAlignedWithPhotodiode; // Simulates alignment with IR photodiode
     private boolean isLEDFlashing; // Simulates LED flashing state
+    private InetAddress espAddress;
+    private int espPort = 3001;  // Set the correct port for ESP32
 
-    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort, String ccpAddress, int ccpPort) throws Exception {
+    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort, String ccpAddress, int ccpPort, String espIp, int espPort) throws Exception {
         this.bladeRunnerId = bladeRunnerId;
         this.stateManager = new StateManager();
         this.commHandler = new UDPCommunicationHandler(mcpAddress, mcpPort, ccpAddress, ccpPort, this::onMessageReceived);
+
+        // Store ESP32 address and port
+        this.espAddress = InetAddress.getByName(espIp);
+        this.espPort = espPort;
 
         // Initially, CCP is in the STARTED state
         this.stateManager.updateState(StateManager.CCPState.STARTED);
@@ -109,6 +115,12 @@ public class SimpleCCP {
         }
         System.out.println("Doors are now closed.");
         areDoorsOpen = false; // Update door status
+    }
+
+    void flashStatusLED() {
+   
+        // Simulate flashing the status LED
+        return;
     }
 
 // Method to stop and open doors
@@ -273,26 +285,56 @@ public class SimpleCCP {
     }
 // Method to process hazard detection from ESP32
 
-    public void onHazardDetected() {
-        System.out.println("Hazard detected by ESP32! Stopping carriage.");
-        stateManager.updateState(StateManager.CCPState.STOPPED); // Update state to STOPPED
-        stopLEDFlashing(); // Stop any LED flashing if needed
-        sendStatus("HAZARD_STOPPED"); // Send status back
+    // Send message to ESP32
+    public void sendMessageToESP(String message) throws Exception {
+        DatagramSocket socket = new DatagramSocket();
+        byte[] buffer = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, espAddress, espPort);
+        socket.send(packet);
+        socket.close();
+        System.out.println("Message sent to ESP32: " + message);
     }
 
-// Simulate receiving a message from ESP32 about a hazard
-    private void onMessageReceivedFromESP32(String message) {
+    // Receive message from ESP32 (could be adapted for continuous listening)
+    public void onMessageReceivedFromESP32(String message) {
         JSONObject jsonMessage = new JSONObject(message);
         String action = jsonMessage.getString("action");
 
         if (action.equals("HAZARD_DETECTED")) {
-            onHazardDetected(); // Stop the carriage on hazard detection
+            onHazardDetected();  // Trigger action on hazard detection
+        } else {
+            System.out.println("Unknown action from ESP32: " + action);
         }
     }
 
+    // Handle hazard detected by ESP32
+    public void onHazardDetected() {
+        System.out.println("Hazard detected by ESP32! Stopping carriage.");
+        stateManager.updateState(StateManager.CCPState.STOPPED);
+        stopLEDFlashing(); // Stop any LED flashing
+        try {
+            sendStatusToESP("HAZARD_STOPPED");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Send status to ESP32
+    private void sendStatusToESP(String status) throws Exception {
+        JSONObject statusMessage = new JSONObject();
+        statusMessage.put("client_type", "ccp");
+        statusMessage.put("message", status);
+        statusMessage.put("client_id", bladeRunnerId);
+        statusMessage.put("timestamp", JSONProcessor.getTimestamp());
+
+        // Send status to ESP32
+        sendMessageToESP(statusMessage.toString());
+    }
+
+
     public static void main(String[] args) {
         try {
-            SimpleCCP ccp = new SimpleCCP("BR01", "127.0.0.1", 2000, "127.0.0.1", 3000);
+            SimpleCCP ccp = new SimpleCCP("BR01", "127.0.0.1", 2000, "127.0.0.1", 3000, "192.168.1.102", 3001);
             ccp.connect(); // Connect to MCP
         } catch (Exception e) {
             e.printStackTrace();
