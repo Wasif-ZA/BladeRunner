@@ -3,11 +3,11 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
-
-import org.json.JSONObject;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import org.json.JSONObject;
 
 public class SimpleCCP {
 
@@ -18,14 +18,15 @@ public class SimpleCCP {
     private boolean isCarriageBehind;
     private boolean isAlignedWithPhotodiode; // Simulates alignment with IR photodiode
     private boolean isLEDFlashing; // Simulates LED flashing state
-    private InetAddress espAddress;
+    private InetAddress espAddress;  // Set the correct IP address for ESP32;
     private int espPort = 3001;  // Set the correct port for ESP32
+    private int sequenceNumbers;  // Sequence number for messages
 
-    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort, String ccpAddress, int ccpPort, String espIp, int espPort) throws Exception {
+    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort, String ccpAddress, int ccpPort, String espIp, int espPort, int sequenceNumber) throws Exception {
         this.bladeRunnerId = bladeRunnerId;
         this.stateManager = new StateManager();
         this.commHandler = new UDPCommunicationHandler(mcpAddress, mcpPort, ccpAddress, ccpPort, this::onMessageReceived);
-
+        this.sequenceNumbers = sequenceNumber;
         // Store ESP32 address and port
         this.espAddress = InetAddress.getByName(espIp);
         this.espPort = espPort;
@@ -362,6 +363,7 @@ private void sendStatusToESP(String status) {
         statusMessage.put("client_type", "ccp");
         statusMessage.put("message", status);
         statusMessage.put("client_id", bladeRunnerId);
+        statusMessage.put("sequence", sequenceNumbers++);  // Increment sequence number
 
         // Log the status message before sending
         System.out.println("Sending status to ESP32: " + statusMessage.toString());
@@ -411,12 +413,56 @@ private String waitForAcknowledgment() throws IOException {
 
     public static void main(String[] args) {
         try {
-            SimpleCCP ccp = new SimpleCCP("BR01", "127.0.0.1", 2000, "127.0.0.1", 3000, "192.168.1.102", 3001);
+            SimpleCCP ccp = new SimpleCCP("BR01", "127.0.0.1", 2000, "127.0.0.1", 3000, "10.20.30.112", 3012, 0);
             ccp.connect(); // Connect to MCP
+            // Test with sample sequence number
+            int testSequenceNumber = 1001;
+    
+            // Create a JSON object for testing
+            JSONObject testMessage = new JSONObject();
+            testMessage.put("client_type", "ccp");
+            testMessage.put("message", "STOPC");
+            testMessage.put("client_id", "BR01");
+            testMessage.put("sequence_number", testSequenceNumber);
+    
+            // Log the message
+            System.out.println("Test JSON to be sent to ESP32:");
+            System.out.println(testMessage.toString(4));  // Pretty print with indentation
+            ccp.sendMessageToESP(testMessage.toString(4));
+    
+            // Initialize SimpleCCPTest with provided details
+            String bladeRunnerId = "BR12";
+            String mcpAddress = "10.20.30.1";
+            int mcpPort = 3012;
+            String ccpAddress = "10.20.30.112";
+            int ccpPort = 3012;
+            String espIp = "10.20.30.112";
+            int espPort = 3012;
+            int sequenceNumber = 1; // Example sequence number
+    
+            SimpleCCP ccpTest = new SimpleCCP(bladeRunnerId, mcpAddress, mcpPort, ccpAddress, ccpPort, espIp, espPort, sequenceNumber);
+            ccpTest.connect(); // Connect to MCP
+            // Create JSON message
+            JSONObject testMessageTest = new JSONObject();
+            testMessageTest.put("client_type", "ccp");
+            testMessageTest.put("message", "STOPC");
+            testMessageTest.put("client_id", bladeRunnerId);
+            testMessageTest.put("sequence_number", sequenceNumber);
+    
+            // Log the message
+            System.out.println("Test JSON to be sent to ESP32:");
+            System.out.println(testMessageTest.toString(4));  // Pretty print with indentation
+    
+            // Send the message
+            ccpTest.sendMessageToESP(testMessageTest.toString(4));
+    
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+  
+
 
     // Interface CommunicationHandler
     interface CommunicationHandler {
