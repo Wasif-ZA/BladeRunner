@@ -3,8 +3,8 @@ import java.net.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.json.JSONObject;
+import org.json.JSONException;
 
 public class SimpleCCP {
 
@@ -15,15 +15,18 @@ public class SimpleCCP {
     private boolean isCarriageBehind;
     private boolean isAlignedWithPhotodiode; // Simulates alignment with IR photodiode
     private boolean isLEDFlashing; // Simulates LED flashing state
-    private InetAddress espAddress;  // Set the correct IP address for ESP32
-    private int espPort;  // Set the correct port for ESP32
+    private InetAddress espAddress;  // IP address for ESP32
+    private int espPort;  // Port for ESP32
     private int sequenceNumbers;  // Sequence number for messages
     private boolean areDoorsOpen = false; // Track if doors are open
 
-    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort, String ccpAddress, int ccpPort, String espIp, int espPort, int sequenceNumber) throws Exception {
+    public SimpleCCP(String bladeRunnerId, String mcpAddress, int mcpPort,
+                     String ccpAddress, int ccpPort, String espIp, int espPort,
+                     int sequenceNumber) throws Exception {
         this.bladeRunnerId = bladeRunnerId;
         this.stateManager = new StateManager();
-        this.commHandler = new UDPCommunicationHandler(mcpAddress, mcpPort, ccpAddress, ccpPort, this::onMessageReceived);
+        this.commHandler = new UDPCommunicationHandler(mcpAddress, mcpPort,
+                ccpAddress, ccpPort, this::onMessageReceived);
         this.sequenceNumbers = sequenceNumber;
         this.espAddress = InetAddress.getByName(espIp);
         this.espPort = espPort;
@@ -40,8 +43,10 @@ public class SimpleCCP {
             String message = JSONProcessor.encodeMessage("ccp", "CCIN", bladeRunnerId);
             commHandler.sendMessage(message);
             stateManager.updateState(StateManager.CCPState.CONNECTED);
+            updateLEDState(); // Update LEDs after state change
         } else {
-            throw new IllegalStateException("Cannot connect in the current state: " + stateManager.getCurrentState());
+            throw new IllegalStateException("Cannot connect in the current state: " +
+                    stateManager.getCurrentState());
         }
     }
 
@@ -51,11 +56,7 @@ public class SimpleCCP {
         System.out.println(JSONProcessor.decodeMessage(message));
 
         // Process the received action from MCP
-        try {
-            processMCPAction(message);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        processMCPAction(message);
 
         // Update the state based on received messages
         updateCarriageDetection(message);
@@ -63,23 +64,50 @@ public class SimpleCCP {
     }
 
     // Method to process MCP actions
-    private void processMCPAction(String message) throws Exception {
+    private void processMCPAction(String message) {
         JSONObject jsonMessage = new JSONObject(message);
-        String action = jsonMessage.getString("action");
+        String messageType = jsonMessage.optString("message", null);
 
-        // Forward the command to ESP32 first
-        forwardCommandToESP(action, jsonMessage);
+        if (messageType == null) {
+            System.out.println("No message type specified in the message.");
+            return;
+        }
 
-        // Handle local CCP logic (if any) based on action
+        switch (messageType) {
+            case "EXEC":
+                String action = jsonMessage.optString("action", null);
+                if (action == null) {
+                    System.out.println("No action specified in EXEC message.");
+                    return;
+                }
+                // Forward the command to ESP32
+                forwardCommandToESP(jsonMessage);
+                // Handle the action
+                handleAction(action, jsonMessage);
+                break;
+            case "AKIN":
+                System.out.println("Received AKIN from MCP.");
+                // Handle AKIN if needed
+                break;
+            case "STRQ":
+                System.out.println("Received STRQ from MCP. Sending status...");
+                sendStatus("STAT");
+                break;
+            default:
+                System.out.println("Unknown message type: " + messageType);
+                break;
+        }
+    }
+
+    // Method to handle actions
+    private void handleAction(String action, JSONObject jsonMessage) {
         switch (action) {
             case "STOPC":
                 stopAndCloseDoors();
-                updateLEDState();
                 sendStatus("STOPC");  // Send status back to MCP after sending to ESP32
                 break;
             case "STOPO":
                 stopAndOpenDoors();
-                updateLEDState();
                 sendStatus("STOPO");
                 break;
             case "FSLOWC":
@@ -88,12 +116,10 @@ public class SimpleCCP {
                 } else {
                     moveForwardSlowly();
                 }
-                updateLEDState();
                 sendStatus("FSLOWC");
                 break;
             case "FFASTC":
                 moveForwardFast();
-                updateLEDState();
                 sendStatus("FFASTC");
                 break;
             case "RSLOWC":
@@ -102,56 +128,58 @@ public class SimpleCCP {
                 } else {
                     moveBackwardSlowly();
                 }
-                updateLEDState();
                 sendStatus("RSLOWC");
                 break;
             case "DISCONNECT":
                 flashStatusLED();
-                updateLEDState();
                 sendStatus("DISCONNECT");
                 break;
             case "HAZARD_DETECTED":
                 onHazardDetected();
-                updateLEDState();
                 sendStatus("HAZARD_DETECTED");
                 break;
             case "FLASH_LED":
                 flashStatusLED();
-                updateLEDState();
                 sendStatus("FLASH_LED");
                 break;
             case "IRLD":
-                String status = jsonMessage.getString("status");
-                if ("ON".equalsIgnoreCase(status)) {
-                    turnOnIRLED();
-                } else if ("OFF".equalsIgnoreCase(status)) {
-                    turnOffIRLED();
+                String status = jsonMessage.optString("status", null);
+                if (status != null) {
+                    if ("ON".equalsIgnoreCase(status)) {
+                        turnOnIRLED();
+                    } else if ("OFF".equalsIgnoreCase(status)) {
+                        turnOffIRLED();
+                    }
+                    sendStatus("IRLD");
+                } else {
+                    System.out.println("No status specified for IRLD action.");
                 }
-                updateLEDState();
-                sendStatus("IRLD");
                 break;
             default:
                 System.out.println("Unknown action: " + action);
+                break;
         }
     }
 
-    private void forwardCommandToESP(String command, JSONObject jsonMessage) {
-        // Encode the command into a JSON message to send to ESP32
-        JSONObject espMessage = new JSONObject();
-        for (String key : jsonMessage.keySet()) {
-            espMessage.put(key, jsonMessage.get(key));
-        }
-
-        // Update client_type to "esp" if needed
-        espMessage.put("client_type", "esp");
-
-        // Send the command to ESP32
+    private void forwardCommandToESP(JSONObject jsonMessage) {
+        // Forward the JSON message to ESP32
         try {
-            sendMessageToESP(espMessage.toString());  // Use the sendMessageToESP function to forward the command to ESP32
-            System.out.println("Command forwarded to ESP32: " + espMessage.toString());
+            sendMessageToESP(jsonMessage.toString());
+            System.out.println("Command forwarded to ESP32: " + jsonMessage.toString());
         } catch (Exception e) {
             System.out.println("Failed to send command to ESP32: " + e.getMessage());
         }
+    }
+
+    // Method to send messages to ESP32
+    public void sendMessageToESP(String message) throws Exception {
+        DatagramSocket socket = new DatagramSocket();
+        byte[] buffer = message.getBytes();
+        DatagramPacket packet = new DatagramPacket(
+                buffer, buffer.length, espAddress, espPort);
+        socket.send(packet);
+        socket.close();
+        System.out.println("Message sent to ESP32: " + message);
     }
 
     // Method to stop and close doors
@@ -164,15 +192,10 @@ public class SimpleCCP {
         if (stateManager.getCurrentState() != StateManager.CCPState.STOPPED) {
             System.out.println("Blade Runner is now stopped.");
             stateManager.updateState(StateManager.CCPState.STOPPED);
+            updateLEDState();
         }
         System.out.println("Doors are now closed.");
         areDoorsOpen = false; // Update door status
-    }
-
-    // Method to flash the BR status LED
-    void flashStatusLED() {
-        // Simulate flashing the status LED
-        System.out.println("Flashing status LED.");
     }
 
     // Method to stop and open doors
@@ -185,6 +208,7 @@ public class SimpleCCP {
         if (stateManager.getCurrentState() != StateManager.CCPState.STOPPED) {
             System.out.println("Blade Runner is now stopped.");
             stateManager.updateState(StateManager.CCPState.STOPPED);
+            updateLEDState();
         }
         System.out.println("Doors are now open.");
         areDoorsOpen = true; // Update door status
@@ -206,7 +230,7 @@ public class SimpleCCP {
     private void moveForwardSlowly() {
         System.out.println("BR moving forward slowly.");
         stateManager.updateState(StateManager.CCPState.SLOW_FORWARD);
-        // Simulate slow forward movement here
+        updateLEDState();
         System.out.println("Moving forward slowly to align with checkpoint...");
     }
 
@@ -214,6 +238,7 @@ public class SimpleCCP {
     private void moveForwardFast() {
         System.out.println("BR moving forward fast.");
         stateManager.updateState(StateManager.CCPState.FULL_SPEED);
+        updateLEDState();
         System.out.println("Blade Runner is now moving at full speed.");
     }
 
@@ -221,8 +246,14 @@ public class SimpleCCP {
     private void moveBackwardSlowly() {
         System.out.println("BR moving backward slowly.");
         stateManager.updateState(StateManager.CCPState.SLOW_BACKWARD);
-        // Simulate slow backward movement here
+        updateLEDState();
         System.out.println("Moving backward slowly to align with checkpoint...");
+    }
+
+    // Method to flash the BR status LED
+    void flashStatusLED() {
+        System.out.println("Flashing status LED.");
+        // Implement LED flashing logic here if needed
     }
 
     // Method to control LED flashing for each state
@@ -306,9 +337,9 @@ public class SimpleCCP {
     // Method to update carriage detection status based on received message
     private void updateCarriageDetection(String message) {
         JSONObject jsonMessage = new JSONObject(message);
-        String detectedCarriageId = jsonMessage.getString("client_id");
+        String detectedCarriageId = jsonMessage.optString("client_id", null);
 
-        if (!detectedCarriageId.equals(bladeRunnerId)) {
+        if (detectedCarriageId != null && !detectedCarriageId.equals(bladeRunnerId)) {
             int currentId = Integer.parseInt(bladeRunnerId.replace("BR", ""));
             int detectedId = Integer.parseInt(detectedCarriageId.replace("BR", ""));
 
@@ -331,29 +362,21 @@ public class SimpleCCP {
     private void adjustSpeed(boolean isCarriageInFront, boolean isCarriageBehind) {
         if (!isCarriageInFront && !isCarriageBehind) {
             stateManager.updateState(StateManager.CCPState.FULL_SPEED);
+            updateLEDState();
             System.out.println("Moving at full speed.");
         } else {
             stateManager.updateState(StateManager.CCPState.MAINTAINING_PACE);
+            updateLEDState();
             System.out.println("Maintaining pace.");
         }
-    }
-
-    // Send message to ESP32
-    public void sendMessageToESP(String message) throws Exception {
-        DatagramSocket socket = new DatagramSocket();
-        byte[] buffer = message.getBytes();
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, espAddress, espPort);
-        socket.send(packet);
-        socket.close();
-        System.out.println("Message sent to ESP32: " + message);
     }
 
     // Receive message from ESP32 (could be adapted for continuous listening)
     public void onMessageReceivedFromESP32(String message) {
         JSONObject jsonMessage = new JSONObject(message);
-        String action = jsonMessage.getString("action");
+        String action = jsonMessage.optString("action", null);
 
-        if (action.equals("HAZARD_DETECTED")) {
+        if ("HAZARD_DETECTED".equals(action)) {
             onHazardDetected();  // Trigger action on hazard detection
         } else {
             System.out.println("Unknown action from ESP32: " + action);
@@ -364,6 +387,7 @@ public class SimpleCCP {
     public void onHazardDetected() {
         System.out.println("Hazard detected by ESP32! Stopping carriage.");
         stateManager.updateState(StateManager.CCPState.STOPPED);
+        updateLEDState();
         stopLEDFlashing(); // Stop any LED flashing
         try {
             sendStatusToESP("HAZARD_STOPPED");
@@ -389,7 +413,7 @@ public class SimpleCCP {
 
             // Wait for acknowledgment from ESP32 with a timeout
             String ack = waitForAcknowledgment();
-            if (ack.equals("ACK")) {
+            if ("ACK".equals(ack)) {
                 System.out.println("ESP32 acknowledged the status.");
             } else {
                 System.err.println("No acknowledgment received from ESP32.");
@@ -411,7 +435,7 @@ public class SimpleCCP {
             String message = new String(packet.getData(), 0, packet.getLength());
 
             // Assume acknowledgment message is "ACK"
-            if (message.equals("ACK")) {
+            if ("ACK".equals(message)) {
                 return "ACK";
             } else {
                 System.err.println("Unexpected acknowledgment message: " + message);
@@ -437,136 +461,22 @@ public class SimpleCCP {
         // Simulate turning off IR LED
     }
 
-    // Main method for testing
+    // Main method
     public static void main(String[] args) {
         try {
-            SimpleCCP ccp = new SimpleCCP("BR01", "127.0.0.1", 2000, "127.0.0.1", 3000, "127.0.0.1", 3012, 0);
+            // Initialize the CCP
+            SimpleCCP ccp = new SimpleCCP(
+                    "BR01", "127.0.0.1", 2000,
+                    "127.0.0.1", 3000,
+                    "127.0.0.1", 3012, 0);
             ccp.connect(); // Connect to MCP
 
-            // Test STOPC command
-            {
-                System.out.println("\n--- Testing STOPC Command ---");
-                // Simulate receiving STOPC command from MCP
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 1);
-                message.put("action", "STOPC");
-                ccp.onMessageReceived(message.toString());
-            }
+            System.out.println("CCP is running and waiting for messages from MCP...");
 
-            // Test STOPO command
-            {
-                System.out.println("\n--- Testing STOPO Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 2);
-                message.put("action", "STOPO");
-                ccp.onMessageReceived(message.toString());
+            // Keep the main thread alive to continue listening
+            synchronized (ccp) {
+                ccp.wait();
             }
-
-            // Test FSLOWC command
-            {
-                System.out.println("\n--- Testing FSLOWC Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 3);
-                message.put("action", "FSLOWC");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test FFASTC command
-            {
-                System.out.println("\n--- Testing FFASTC Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 4);
-                message.put("action", "FFASTC");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test RSLOWC command
-            {
-                System.out.println("\n--- Testing RSLOWC Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 5);
-                message.put("action", "RSLOWC");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test DISCONNECT command
-            {
-                System.out.println("\n--- Testing DISCONNECT Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 6);
-                message.put("action", "DISCONNECT");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test HAZARD_DETECTED command
-            {
-                System.out.println("\n--- Testing HAZARD_DETECTED Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 7);
-                message.put("action", "HAZARD_DETECTED");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test FLASH_LED command
-            {
-                System.out.println("\n--- Testing FLASH_LED Command ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 8);
-                message.put("action", "FLASH_LED");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test IRLD command with status ON
-            {
-                System.out.println("\n--- Testing IRLD Command with status ON ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 9);
-                message.put("action", "IRLD");
-                message.put("status", "ON");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // Test IRLD command with status OFF
-            {
-                System.out.println("\n--- Testing IRLD Command with status OFF ---");
-                JSONObject message = new JSONObject();
-                message.put("client_type", "CCP");
-                message.put("message", "EXEC");
-                message.put("client_id", "BR01");
-                message.put("sequence_number", 10);
-                message.put("action", "IRLD");
-                message.put("status", "OFF");
-                ccp.onMessageReceived(message.toString());
-            }
-
-            // You can comment out any of the above blocks to test individual components
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -578,7 +488,7 @@ public class SimpleCCP {
 
         void sendMessage(String message) throws Exception;
 
-        void listenForMessages() throws IOException;
+        void listenForMessages();
     }
 
     // Class UDPCommunicationHandler
@@ -590,7 +500,9 @@ public class SimpleCCP {
         private MessageListener messageListener;
 
         // Constructor
-        public UDPCommunicationHandler(String mcpAddress, int mcpPort, String ccpAddress, int ccpPort, MessageListener listener) throws Exception {
+        public UDPCommunicationHandler(String mcpAddress, int mcpPort,
+                                       String ccpAddress, int ccpPort,
+                                       MessageListener listener) throws Exception {
             this.mcpAddress = InetAddress.getByName(mcpAddress);
             this.mcpPort = mcpPort;
             this.socket = new DatagramSocket(ccpPort, InetAddress.getByName(ccpAddress));
@@ -606,7 +518,7 @@ public class SimpleCCP {
             byte[] buffer = message.getBytes();
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length, mcpAddress, mcpPort);
             socket.send(packet);
-            System.out.println("Message sent: " + message);
+            System.out.println("Message sent to MCP: " + message);
         }
 
         // Listens for incoming messages and notifies the listener
@@ -614,7 +526,7 @@ public class SimpleCCP {
         public void listenForMessages() {
             try {
                 while (true) {
-                    byte[] buffer = new byte[1024];
+                    byte[] buffer = new byte[2048];
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                     socket.receive(packet);
 
@@ -637,7 +549,8 @@ public class SimpleCCP {
     class StateManager {
 
         public enum CCPState {
-            STARTED, CONNECTED, STOPPED, FULL_SPEED, MAINTAINING_PACE, SLOW_FORWARD, SLOW_BACKWARD
+            STARTED, CONNECTED, STOPPED, FULL_SPEED,
+            MAINTAINING_PACE, SLOW_FORWARD, SLOW_BACKWARD
         }
 
         private CCPState currentState;
@@ -649,7 +562,6 @@ public class SimpleCCP {
         public void updateState(CCPState newState) {
             this.currentState = newState;
             System.out.println("State updated to: " + newState);
-            updateLEDState(); // Update LEDs according to the new state
         }
 
         public CCPState getCurrentState() {
@@ -661,7 +573,9 @@ public class SimpleCCP {
     static class JSONProcessor {
 
         // Encodes a message into JSON format
-        public static String encodeMessage(String clientType, String messageType, String clientId) {
+        public static String encodeMessage(String clientType,
+                                           String messageType,
+                                           String clientId) {
             JSONObject message = new JSONObject();
             message.put("client_type", clientType);
             message.put("message", messageType);
@@ -681,4 +595,5 @@ public class SimpleCCP {
             return java.time.LocalDateTime.now().toString();
         }
     }
+
 }
