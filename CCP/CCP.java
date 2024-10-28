@@ -5,6 +5,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,9 @@ public class CCP {
     private int espPort;  // Port for ESP32
     private int sequenceNumbers;  // Sequence number for messages
     private boolean areDoorsOpen = false; // Track if doors are open
+    private ExecutorService espListenerExecutor; // Executor for ESP32 listener
+    private ScheduledExecutorService heartbeatExecutor;
+
 
     public CCP(String bladeRunnerId, String mcpAddress, int mcpPort,
                String ccpAddress, int ccpPort, String espIp, int espPort,
@@ -40,11 +44,14 @@ public class CCP {
         this.sequenceNumbers = sequenceNumber;
         this.espAddress = InetAddress.getByName(espIp);
         this.espPort = espPort;
+        this.espListenerExecutor = Executors.newSingleThreadExecutor();
 
         // Initially, CCP is in the STARTED state
         this.stateManager.updateState(StateManager.CCPState.STARTED);
         this.isAlignedWithPhotodiode = false; // Initialize photodiode alignment
         this.isLEDFlashing = false; // LED is not flashing initially
+        startListeningToESP();
+        startHeartbeat();
     }
 
     // Method to connect to MCP
@@ -60,18 +67,84 @@ public class CCP {
         }
     }
 
-    // Callback for receiving messages
-    private void onMessageReceived(String message) {
-        System.out.println("Message received by " + bladeRunnerId + ":");
-        System.out.println(JSONProcessor.decodeMessage(message));
-
-        // Process the received action from MCP
-        processMCPAction(message);
-
-        // Update the state based on received messages
-        updateCarriageDetection(message);
-        checkCarriagePositions(); // Check for nearby carriages after receiving a message
+    private void startListeningToESP() {
+        espListenerExecutor.submit(() -> {
+            DatagramSocket socket = null;
+            try {
+                socket = new DatagramSocket(espPort);
+                byte[] buffer = new byte[1024];
+    
+                while (true) {
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    socket.receive(packet);
+                    String message = new String(packet.getData(), 0, packet.getLength());
+    
+                    // Process the received JSON message
+                    onMessageReceivedFromESP32(message);
+                }
+            } catch (IOException e) {
+                System.err.println("Error receiving message from ESP32: " + e.getMessage());
+            } finally {
+                if (socket != null && !socket.isClosed()) {
+                    socket.close();
+                }
+            }
+        });
     }
+    
+     // Stop the heartbeat executor when shutting down CCP
+     public void stop() {
+        if (espListenerExecutor != null && !espListenerExecutor.isShutdown()) {
+            espListenerExecutor.shutdown();
+        }
+        if (heartbeatExecutor != null && !heartbeatExecutor.isShutdown()) {
+            heartbeatExecutor.shutdown();
+        }
+    }
+    
+
+    private void startHeartbeat() {
+        heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
+        heartbeatExecutor.scheduleAtFixedRate(() -> {
+            try {
+                sendHeartbeat();
+            } catch (Exception e) {
+                System.err.println("Error in sending heartbeat: " + e.getMessage());
+            }
+        }, 0, 2, TimeUnit.SECONDS); // Send every 2 seconds
+    }
+
+    private void sendHeartbeat() throws Exception {
+        String heartbeatMessage = JSONProcessor.encodeMessage("ccp", "STRQ", bladeRunnerId);
+        commHandler.sendMessage(heartbeatMessage);
+        System.out.println("Sent heartbeat to MCP.");
+    }
+
+      // Handling the MCP acknowledgment response (AKST)
+      private void onHeartbeatAcknowledgmentReceived(String message) {
+        System.out.println("Heartbeat acknowledged by MCP: " + JSONProcessor.decodeMessage(message));
+        // Reset missed heartbeat count, if tracking
+    }
+
+    // Callback for receiving messages
+private void onMessageReceived(String message) {
+    System.out.println("Message received by " + bladeRunnerId + ":");
+    JSONObject jsonMessage = new JSONObject(message);
+    String messageType = jsonMessage.optString("message", null);
+
+    if ("AKST".equals(messageType)) {
+        // Call the heartbeat acknowledgment handler if the message is an acknowledgment
+        onHeartbeatAcknowledgmentReceived(message);
+        return;
+    }
+
+    // Process other types of MCP actions
+    System.out.println(JSONProcessor.decodeMessage(message));
+    processMCPAction(message);
+    updateCarriageDetection(message);
+    checkCarriagePositions(); // Check for nearby carriages after receiving a message
+}
+
 
     // Method to process MCP actions
     private void processMCPAction(String message) {
@@ -474,23 +547,36 @@ public class CCP {
     // Main method
     public static void main(String[] args) {
         try {
-            // Initialize the CCP
+            // Initialize the CCP with the specified values
+            String bladeRunnerId = "BR12";
+            //MCP 
+            String mcpAddress = "10.20.30.187";
+            int mcpPort = 3012;
+            //CCP RECEIVE
+            String ccpAddress = "10.20.30.153";
+            int ccpPort = 3000;
+            //ESP
+            String espIp = "10.20.30.112";
+            int espPort = 3012;
+            int sequenceNumber = 1;
+    
             CCP ccp = new CCP(
-                    "BR01", "127.0.0.1", 2000,
-                    "127.0.0.1", 3000,
-                    "127.0.0.1", 3012, 0);
-            ccp.connect(); // Connect to MCP
-
+                    bladeRunnerId, mcpAddress, mcpPort,
+                    ccpAddress, ccpPort, espIp, espPort, sequenceNumber);
+                    
+            ccp.connect();
+    
             System.out.println("CCP is running and waiting for messages from MCP...");
-
+    
             // Keep the main thread alive to continue listening
             synchronized (ccp) {
                 ccp.wait();
             }
-
+    
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+    
 }
 

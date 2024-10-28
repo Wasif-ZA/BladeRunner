@@ -198,9 +198,9 @@ public class MCP {
     // Main method for testing all MCP commands
     public static void main(String[] args) {
         try {
-            String ccpIp = "127.0.0.1"; // CCP IP address
+            String ccpIp = "10.20.30.153"; // CCP IP address
             int ccpPort = 3000;         // CCP Port
-            String ccpId = "BR01";      // Blade Runner ID
+            String ccpId = "BR12";      // Blade Runner ID
 
             MCP mcp = new MCP(ccpIp, ccpPort);
 
@@ -210,38 +210,38 @@ public class MCP {
             // Give the CCP some time to start and connect
             Thread.sleep(2000);
 
-            // Send all commands to test CCP functionalities
-            mcp.sendStatusRequest(ccpId);               // Heartbeat check
-            Thread.sleep(1000);
+            // // Send all commands to test CCP functionalities
+            // mcp.sendStatusRequest(ccpId);               // Heartbeat check
+            // Thread.sleep(1000);
 
-            mcp.sendMoveForwardSlowCommand(ccpId);      // Move forward slowly
-            Thread.sleep(1000);
+            // mcp.sendMoveForwardSlowCommand(ccpId);      // Move forward slowly
+            // Thread.sleep(1000);
 
             mcp.sendMoveForwardFastCommand(ccpId);      // Move forward fast
             Thread.sleep(1000);
 
-            mcp.sendMoveBackwardSlowCommand(ccpId);     // Move backward slowly
-            Thread.sleep(1000);
+            // mcp.sendMoveBackwardSlowCommand(ccpId);     // Move backward slowly
+            // Thread.sleep(1000);
 
-            mcp.sendStopAndCloseCommand(ccpId);         // Stop and close doors
-            Thread.sleep(1000);
+            // mcp.sendStopAndCloseCommand(ccpId);         // Stop and close doors
+            // Thread.sleep(1000);
 
-            mcp.sendStopAndOpenCommand(ccpId);          // Stop and open doors
-            Thread.sleep(1000);
+            // mcp.sendStopAndOpenCommand(ccpId);          // Stop and open doors
+            // Thread.sleep(1000);
 
-            mcp.sendFlashLedCommand(ccpId);             // Flash LED
-            Thread.sleep(1000);
+            // mcp.sendFlashLedCommand(ccpId);             // Flash LED
+            // Thread.sleep(1000);
 
-            mcp.sendIRLedOnCommand(ccpId);              // Turn IR LED on
-            Thread.sleep(1000);
+            // mcp.sendIRLedOnCommand(ccpId);              // Turn IR LED on
+            // Thread.sleep(1000);
 
-            mcp.sendIRLedOffCommand(ccpId);             // Turn IR LED off
-            Thread.sleep(1000);
+            // mcp.sendIRLedOffCommand(ccpId);             // Turn IR LED off
+            // Thread.sleep(1000);
 
-            mcp.sendHazardCommand(ccpId);               // Simulate hazard detected
-            Thread.sleep(1000);
+            // mcp.sendHazardCommand(ccpId);               // Simulate hazard detected
+            // Thread.sleep(1000);
 
-            mcp.sendDisconnectCommand(ccpId);           // Disconnect command
+            // mcp.sendDisconnectCommand(ccpId);           // Disconnect command
 
             // Keep the main thread alive to continue listening
             Thread.sleep(5000);
