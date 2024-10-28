@@ -215,28 +215,7 @@ private void onMessageReceived(String message) {
                 break;
             case "DISCONNECT":
                 flashStatusLED();
-                sendStatus("DISCONNECT");
-                break;
-            case "HAZARD_DETECTED":
-                onHazardDetected();
-                sendStatus("HAZARD_DETECTED");
-                break;
-            case "FLASH_LED":
-                flashStatusLED();
-                sendStatus("FLASH_LED");
-                break;
-            case "IRLD":
-                String status = jsonMessage.optString("status", null);
-                if (status != null) {
-                    if ("ON".equalsIgnoreCase(status)) {
-                        turnOnIRLED();
-                    } else if ("OFF".equalsIgnoreCase(status)) {
-                        turnOffIRLED();
-                    }
-                    sendStatus("IRLD");
-                } else {
-                    System.out.println("No status specified for IRLD action.");
-                }
+                sendStatus("OFLN");
                 break;
             default:
                 System.out.println("Unknown action: " + action);
@@ -532,29 +511,17 @@ private void onMessageReceived(String message) {
         }
     }
 
-    // Method to turn on IR LED
-    private void turnOnIRLED() {
-        System.out.println("Turning ON IR LED.");
-        // Simulate turning on IR LED
-    }
-
-    // Method to turn off IR LED
-    private void turnOffIRLED() {
-        System.out.println("Turning OFF IR LED.");
-        // Simulate turning off IR LED
-    }
-
     // Main method
     public static void main(String[] args) {
         try {
             // Initialize the CCP with the specified values
             String bladeRunnerId = "BR12";
             //MCP 
-            String mcpAddress = "10.20.30.187";
-            int mcpPort = 3012;
+            String mcpAddress = "10.20.30.1"; //ACTUAL: 10.20.30.1
+            int mcpPort = 2000; //ACTUAL: 2000
             //CCP RECEIVE
-            String ccpAddress = "10.20.30.153";
-            int ccpPort = 3000;
+            String ccpAddress = "10.20.30.1"; //ACTUAL: 10.20.30.1
+            int ccpPort = 3012; //ACTUAL: 3012
             //ESP
             String espIp = "10.20.30.112";
             int espPort = 3012;
