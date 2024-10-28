@@ -16,15 +16,32 @@ This project simulates a Carriage Control System using an ESP32 microcontroller,
 
 ## Project Structure
 
-The project is split into several files for modularity:
+The project is organized into the following directories and files:
 
-- **Java Components**:
-  - `CCP.java`: A Java program that simulates the Carriage Control Processor (CCP) interacting with the MCP and ESP32 devices over a network.
-  - `UDPCommunicationHandler.java`: Handles communication between the CCP and MCP via UDP.
-  - `StateManager.java`: Manages the state of the Carriage Control Processor.
-  - `JSONProcessor.java`: Encodes and decodes messages in JSON format.
-  - `CommunicationHandler.java`: Interface defining methods for sending and receiving messages.
-  - `MessageListener.java`: Interface for handling incoming messages.
+```plaintext
+BladeRunner/
+├── CCP/
+│   ├── CCP.java
+│   ├── CommunicationHandler.java
+│   ├── JSONProcessor.java
+│   ├── MCP.java
+│   ├── MessageListener.java
+│   ├── StateManager.java
+│   └── UDPCommunicationHandler.java
+│
+├── DOCs/
+│   ├── MethodDocs.md
+│   ├── Setup.md
+│   ├── T3_C1_Design_Document.docx
+│   └── T3_C1_Scoping_Document.docx
+│
+└── .vscode/
+    └── settings.json
+```
+
+- **CCP/**: Contains Java source files for the Carriage Control Processor.
+- **DOCs/**: Holds documentation files, including setup instructions, method documentation, and design documents.
+- **.vscode/**: Contains VS Code-specific settings for the project.
 
 ## Hardware Requirements
 
