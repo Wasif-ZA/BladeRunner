@@ -41,10 +41,19 @@ BladeRunner/
     └── settings.json
 ```
 
+
 - **CCP/lib**: Contains external library files, such as `json-20240303.jar`, used for JSON processing.
 - **CCP**: Contains Java source files for the Carriage Control Processor.
 - **DOCs**: Holds various documentation files, including setup instructions, method documentation, and design documents.
-- **.vscode**: Contains VS Code-specific settings for the project.
+- **.vscode**: Contains VS Code-specific settings for the projec
+- **Java Components**:
+  - `CCP.java`: A Java program that simulates the Carriage Control Processor (CCP) interacting with the MCP and ESP32 devices over a network.
+  - `UDPCommunicationHandler.java`: Handles communication between the CCP and MCP via UDP.
+  - `StateManager.java`: Manages the state of the Carriage Control Processor.
+  - `JSONProcessor.java`: Encodes and decodes messages in JSON format.
+  - `CommunicationHandler.java`: Interface defining methods for sending and receiving messages.
+  - `MessageListener.java`: Interface for handling incoming messages.
+
 
 ## Hardware Requirements
 
@@ -87,9 +96,10 @@ BladeRunner/
 
 ### Step 4: Add the JSON Library to the Classpath
 
-1. Ensure that `json-20240303.jar` (or the appropriate version of the JSON library) is located in the `lib` folder inside your project directory.
+
+1. Ensure that `json-20240303.jar` (or the appropriate version of the JSON library) is located in the `lib` folder inside your project director
 2. In the **Java Projects** view on the left side of VS Code, click the `+` icon under **Referenced Libraries**.
-3. Select the `lib/json-20240303.jar` file to add it to the classpath.
+3. Select the `lib/json-20220320.jar` file to add it to the classpath.
 
 ### Step 5: Customize Network Addresses (if needed)
 
@@ -135,7 +145,7 @@ Similarly, messages are sent to the ESP32 for hardware-level control of the carr
 
 ## Troubleshooting
 
-- **No JSON Recognition**: Ensure that the `json-20240303.jar` is properly added to the classpath in VS Code. You can verify this by checking the **Java Projects** section.
+- **No JSON Recognition**: Ensure that the `json-20220320.jar` is properly added to the classpath in VS Code. You can verify this by checking the **Java Projects** section.
 - **Network Issues**: Make sure your network configuration (IP addresses, ports) is correct for the ESP32 and MCP. You might need to adjust firewall settings if using multiple devices on a Wi-Fi network.
 - **Build Errors**: Verify that the **Java SDK** is set correctly in VS Code by going to **Settings > Java: Configuration**.
 
@@ -165,3 +175,4 @@ To verify that JSON processing works correctly in your project:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
