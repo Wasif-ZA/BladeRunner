@@ -16,8 +16,36 @@ This project simulates a Carriage Control System using an ESP32 microcontroller,
 
 ## Project Structure
 
-The project is split into several files for modularity:
+The project is organized into the following directories and files:
 
+```plaintext
+BladeRunner/
+├── CCP/
+│   ├── lib/
+│   │   └── json-20240303.jar
+│   ├── CCP.java
+│   ├── CommunicationHandler.java
+│   ├── JSONProcessor.java
+│   ├── MCP.java
+│   ├── MessageListener.java
+│   ├── StateManager.java
+│   └── UDPCommunicationHandler.java
+│
+├── DOCs/
+│   ├── MethodDocs.md
+│   ├── Setup.md
+│   ├── T3_C1_Design_Document.docx
+│   └── T3_C1_Scoping_Document.docx
+│
+└── .vscode/
+    └── settings.json
+```
+
+
+- **CCP/lib**: Contains external library files, such as `json-20240303.jar`, used for JSON processing.
+- **CCP**: Contains Java source files for the Carriage Control Processor.
+- **DOCs**: Holds various documentation files, including setup instructions, method documentation, and design documents.
+- **.vscode**: Contains VS Code-specific settings for the projec
 - **Java Components**:
   - `CCP.java`: A Java program that simulates the Carriage Control Processor (CCP) interacting with the MCP and ESP32 devices over a network.
   - `UDPCommunicationHandler.java`: Handles communication between the CCP and MCP via UDP.
@@ -25,6 +53,7 @@ The project is split into several files for modularity:
   - `JSONProcessor.java`: Encodes and decodes messages in JSON format.
   - `CommunicationHandler.java`: Interface defining methods for sending and receiving messages.
   - `MessageListener.java`: Interface for handling incoming messages.
+
 
 ## Hardware Requirements
 
@@ -67,7 +96,8 @@ The project is split into several files for modularity:
 
 ### Step 4: Add the JSON Library to the Classpath
 
-1. Ensure that `json-20220320.jar` (or the appropriate version of the JSON library) is located in the `lib` folder inside your project directory.
+
+1. Ensure that `json-20240303.jar` (or the appropriate version of the JSON library) is located in the `lib` folder inside your project director
 2. In the **Java Projects** view on the left side of VS Code, click the `+` icon under **Referenced Libraries**.
 3. Select the `lib/json-20220320.jar` file to add it to the classpath.
 
@@ -145,3 +175,4 @@ To verify that JSON processing works correctly in your project:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

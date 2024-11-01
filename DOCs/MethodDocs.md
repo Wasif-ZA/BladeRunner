@@ -1,6 +1,3 @@
-
----
-
 # CCP (Carriage Control Program) Documentation
 
 ## 1. **Overview of the CCP**
@@ -29,7 +26,7 @@ The CCP is responsible for controlling the movement and behavior of the Blade Ru
 The **UDPCommunicationHandler** is responsible for actual communication with the MCP using the UDP protocol.
 
 - **sendMessage(String message)**: Sends a message in JSON format to the MCP.
-- **listenForMessages()**: Continuously listens for messages from the MCP in a separate thread. Once a message is received, the `onMessageReceived` callback in `SimpleCCP` processes it.
+- **listenForMessages()**: Continuously listens for messages from the MCP in a separate thread. Once a message is received, the `onMessageReceived` callback in `CCP` processes it.
 
 ### **c) State Management (StateManager):**
 The **StateManager** tracks the CCP’s state using an enumerated type `CCPState`, which includes:
@@ -122,5 +119,3 @@ The ESP32 can send hazard detection messages to the CCP. Upon receiving such a m
 ### **4. State Management and Communication Improvements**
 - **Rationale**: The BR’s state management system was enhanced to respond appropriately to commands from the MCP and ESP32. 
 - **Impact**: Ensures proper state transitions and accurate status reporting to the MCP and ESP32.
-
----
