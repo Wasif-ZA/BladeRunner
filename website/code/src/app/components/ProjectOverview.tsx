@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 const ProjectOverview: React.FC = () => {
   const features = [
     { label: "Architecture", value: "Distributed IoT" },
-    { label: "Latency", value: "< 50ms UDP" },
+    { label: "Transport", value: "UDP unicast" },
     { label: "Safety", value: "Fail-Safe Logic" },
     { label: "Protocol", value: "Custom JSON" },
   ];
@@ -41,8 +41,8 @@ const ProjectOverview: React.FC = () => {
                 <span className="text-cyan-300 font-mono text-sm mx-1">CCP</span> (Carriage Control Processor) nodes.
               </p>
               <p>
-                By leveraging <strong className="text-white font-normal">UDP multicasting</strong> and <strong className="text-white font-normal">ESP32 hardware integration</strong>,
-                the system achieves precise, low-latency synchronization of physical carriage movements, door actuation, and hazard detection.
+                By leveraging <strong className="text-white font-normal">UDP messaging</strong> and <strong className="text-white font-normal">ESP32 hardware integration</strong>,
+                the system coordinates carriage movement, door actuation, and hazard detection.
               </p>
             </div>
           </motion.div>

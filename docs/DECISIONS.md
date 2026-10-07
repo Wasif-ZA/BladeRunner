@@ -19,6 +19,7 @@ This log captures key engineering decisions and trade-offs made to keep the proj
 * **Decision:** Add scripts and CI checks for `website/code/` as the most runnable surface.
 * **Why:** It provides a fast feedback loop and demonstrates professional repo hygiene.
 * **Trade-off:** Java and firmware linting/test automation can be added later.
+* **Update:** CI now also compiles `CCP/` and runs `CCP.CCPSelfTest`. Firmware is still not built in CI.
 
 ## 4) Use TypeScript checks as the baseline lint/test signal
 

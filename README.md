@@ -1,164 +1,151 @@
-# BladeRunner — Carriage Control System Prototype
+<p align="center">
+  <a href="#quickstart"><strong>Quickstart</strong></a> &middot;
+  <a href="#how-it-works"><strong>How it works</strong></a> &middot;
+  <a href="#run-the-control-processors"><strong>Control processors</strong></a> &middot;
+  <a href="#docs"><strong>Docs</strong></a>
+</p>
 
-BladeRunner is an end-to-end carriage control prototype that combines ESP32 firmware, Java-based control processors, and a Next.js operations UI.
+<p align="center">
+  <img src="https://img.shields.io/badge/firmware-ESP32-E7352C" alt="ESP32 firmware">
+  <img src="https://img.shields.io/badge/control-Java%2011%2B-007396" alt="Java 11+">
+  <img src="https://img.shields.io/badge/UI-Next.js%2016-000000" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+</p>
 
-## Problem / Why
+<br>
 
-Modern control systems often fail the “demo gap”: the hardware works, but the project is hard to understand, run, and evaluate quickly. BladeRunner aims to close that gap by packaging embedded control logic, processor simulation, and a web interface into a single, reviewable repo.
+# BladeRunner drives a model carriage from a web page, through Java, down to an ESP32.
 
-It is designed for:
+A carriage control prototype: firmware, control processors and an operator UI in one repo.
 
-* Teams evaluating system-thinking across hardware and software.
-* Recruiters and reviewers who need a fast, credible walkthrough.
-* Developers who want a clear starting point for extending the project.
+**If the carriage is the _train_, BladeRunner is the _signal box_.**
 
-## What it does (Features)
+A master control processor (MCP) sends a command. The carriage control processor (CCP) checks it
+against the carriage state and passes it to the ESP32 over UDP. The ESP32 moves the carriage and
+reports back. Every message is JSON.
 
-* Simulates a carriage control processor (CCP) in Java.
-* Encodes and decodes command messages using JSON.
-* Models carriage state transitions in a dedicated state manager.
-* Provides UDP-based communication handlers for processor messaging.
-* Includes ESP32-oriented firmware and hardware integration scaffolding.
-* Ships a Next.js UI for a fast, visual project entry point.
-* Centralizes architecture notes and engineering decisions in `/docs`.
+**See the whole control chain in one repo, not three.**
 
-## Tech Stack
+|        | Step              | Example                                           |
+| ------ | ----------------- | ------------------------------------------------- |
+| **01** | Run the UI        | _`npm --prefix website/code ci`, then `run dev`_  |
+| **02** | Self-test the CCP | _`java ... CCP.CCPSelfTest`_                      |
+| **03** | Watch them talk   | _ESP32 stand-in, CCP and MCP in three terminals_  |
 
-**Frontend**
-* Next.js 16
-* React 19
-* Tailwind CSS
+> [!TIP]
+> **🚆 Or hand it to your agent.** Paste this into Claude Code or Codex:
+>
+> ```text
+> Clone https://github.com/Wasif-ZA/BladeRunner. Run `npm --prefix website/code ci` and
+> `npm --prefix website/code run dev`, then compile and run the CCP self-test from the README.
+> ```
 
-**Backend / Control Layer**
-* Java (JDK 11+)
-* UDP networking
-* `org.json` (via local JAR)
+<br>
 
-**Embedded / Hardware**
-* ESP32 firmware (C/C++ toolchains expected)
+## Problems BladeRunner solves
 
-**Tools**
-* npm / Node.js 20+
-* TypeScript
-* GitHub Actions (CI for the web UI)
+| Without BladeRunner | With BladeRunner |
+| --- | --- |
+| ❌ The hardware works, but nobody can follow the project without the lab. | ✅ The CCP self-test runs on localhost with a stand-in MCP and ESP32. |
+| ❌ Control logic is tangled into firmware. | ✅ State transitions live in a Java state manager you can test on a laptop. |
+| ❌ Messages are ad hoc strings. | ✅ Commands are encoded and decoded as JSON. |
+| ❌ Lab IP addresses are baked into the code. | ✅ Defaults are `127.0.0.1`; lab addresses are command-line arguments. |
 
-## Architecture Overview
+<br>
 
-```text
+## How it works
+
+```
 [Operator]
-   |
-   v
-[Next.js UI: website/code]
-   |
-   v
-[Control Processors: CCP / MCP simulations]
-   |
-   v
-[ESP32 Firmware: ESP]
-   |
-   v
-[Physical carriage, doors, sensors]
+    │
+    ▼
+Next.js UI (website/code)        in-browser model of the CCP state machine
+    │
+    ▼
+MCP  ──UDP 3000──▶  CCP  ──UDP 3001──▶  ESP32 firmware (ESP/)
+                                            │
+                                            ▼
+                               carriage, doors, sensors
 ```
 
-BladeRunner is organized as a multi-layer system:
+<details>
+<summary>Open: what each part does</summary>
 
-1. **Operations UI (`website/code/`)** provides a fast, runnable entry point.
-2. **Control processors (`CCP/` and related modules)** handle command parsing and state transitions.
-3. **ESP32 firmware (`ESP/`)** is responsible for hardware-level execution.
+| Part | Folder | What it does |
+| --- | --- | --- |
+| Operations UI | `website/code/` | Next.js 16, React 19, Tailwind. Models the CCP state machine in the browser; it does not connect to the Java processes |
+| Control processors | `CCP/` | Java. Command parsing, the carriage state manager, UDP handlers, `org.json` from a local JAR |
+| Firmware | `ESP/`, `Carriage/`, `MVP/` | ESP32 sketches. Built with the Arduino IDE or PlatformIO, not by CI |
+| Older copy | `enggg/` | An earlier CCP and the `TestESPServer` stand-in |
 
-A more detailed write-up is available in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+CI typechecks and builds the UI, and compiles the CCP and runs its self-test.
 
-## How to Run Locally
+</details>
 
-### Prerequisites
+<br>
 
-* Node.js 20+ and npm
-* Java JDK 11+
+## Quickstart
 
-### Install
-
-Install the web UI dependencies:
+Node.js 20+ and Java JDK 11+.
 
 ```bash
+git clone https://github.com/Wasif-ZA/BladeRunner
+cd BladeRunner
 npm --prefix website/code ci
-```
-
-### Run
-
-Start the Next.js operations UI:
-
-```bash
 npm --prefix website/code run dev
 ```
 
-Then open:
+Open http://localhost:3000. No environment variables are needed.
 
-* <http://localhost:3000>
+## Run the control processors
 
-### Build / Test Commands
-
-From the repository root:
+Self-test (on Windows use `;` instead of `:` in `-cp`):
 
 ```bash
-npm --prefix website/code run lint
-npm --prefix website/code run format
-npm --prefix website/code run test
-npm --prefix website/code run build
+javac -d out -cp CCP/lib/json-20240303.jar CCP/*.java
+java -cp "out:CCP/lib/json-20240303.jar" CCP.CCPSelfTest
 ```
 
-To compile the Java control processor locally:
+It starts a real CCP with a stand-in MCP and ESP32 and checks connect, FFASTC, STOPC, STOPO,
+FSLOWC, RSLOWC and the ESP hazard stop.
+
+<details>
+<summary>Open: watch the three processes over UDP</summary>
+
+Three terminals, in this order:
 
 ```bash
-cd CCP
-javac -cp "lib/json-20240303.jar" *.java
+javac -d out -cp enggg/lib/json-20240303.jar enggg/TestESPServer.java
+java -cp "out:enggg/lib/json-20240303.jar" TestESPServer   # ESP32 stand-in on UDP 3001
+java -cp "out:CCP/lib/json-20240303.jar" CCP.CCP           # CCP on UDP 3000
+java -cp "out:CCP/lib/json-20240303.jar" CCP.MCP           # MCP on UDP 2000, sends FFASTC
 ```
 
-## Configuration
-
-This repo includes a safe starter env file:
-
-* Copy `.env.example` to `.env` if you need environment variables later.
+On the lab network, pass the addresses:
 
 ```bash
-cp .env.example .env
+# CCP args: mcpHost mcpPort ccpHost ccpPort espHost espPort espListenPort
+java -cp "out:CCP/lib/json-20240303.jar" CCP.CCP 10.20.30.187 3012 10.20.30.153 3000 10.20.30.112 3012 3012
+# MCP args: ccpHost ccpPort
+java -cp "out:CCP/lib/json-20240303.jar" CCP.MCP 10.20.30.153 3000
 ```
 
-At the moment, no environment variables are required to run the UI locally.
+</details>
 
-## Screenshots / Demo
+## Roadmap
 
-Binary image assets are intentionally not committed in this environment. Use the local dev server for a live demo:
+- ⬜ Turn the UI into a real command console wired to the CCP
+- ⬜ One shared message schema for processors and firmware
+- ⬜ Screenshots or a demo recording
 
-```bash
-npm --prefix website/code run dev
-```
+## Docs
 
-Then visit <http://localhost:3000>.
+1. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the layers and how they connect.
+2. [`docs/DECISIONS.md`](docs/DECISIONS.md): engineering decisions.
+3. [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md): the project at a glance.
 
-## Key Decisions (Engineering)
-
-* Consolidated documentation under `/docs` and moved legacy material to `/docs/legacy`.
-* Focused CI on the runnable Next.js surface first to deliver fast feedback.
-* Removed generated artifacts like `node_modules/` from version control expectations.
-* Standardized root-level hygiene with a repo-wide `.gitignore` and contributor guidance.
-
-See [`docs/DECISIONS.md`](docs/DECISIONS.md) for more detail.
-
-## Roadmap / Next Improvements
-
-* Add CI checks for Java compilation and basic simulation tests.
-* Expand the operations UI into a real command console.
-* Define a shared message schema between processors and firmware.
-* Add real UI screenshots or a demo recording once assets can be hosted externally.
-* Add API-level documentation if/when HTTP services are introduced.
+Tests: `npm --prefix website/code run test`, plus the CCP self-test above.
 
 ## License
 
-This project is licensed under the MIT License. See [`LICENSE`](LICENSE).
-
-## Contact
-
-* GitHub: [@Wasif-ZA](https://github.com/Wasif-ZA)
-* LinkedIn: https://www.linkedin.com/in/wasif-zaman-4228b5245/
-* Email: wasif.zaman1@gmail.com
-
+MIT. See [`LICENSE`](LICENSE).

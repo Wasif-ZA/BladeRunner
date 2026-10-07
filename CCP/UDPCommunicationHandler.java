@@ -43,7 +43,11 @@ public class UDPCommunicationHandler implements CommunicationHandler {
                 socket.receive(packet);
 
                 String message = new String(packet.getData(), 0, packet.getLength());
-                messageListener.onMessageReceived(message);
+                try {
+                    messageListener.onMessageReceived(message);
+                } catch (RuntimeException e) {
+                    System.err.println("Dropped bad message: " + e.getMessage());
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();

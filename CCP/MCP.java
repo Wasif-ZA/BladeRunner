@@ -148,13 +148,14 @@ public class MCP {
 
         while (true) {
             try {
+                packet.setLength(buffer.length);
                 mcpSocket.receive(packet);
                 String received = new String(packet.getData(), 0, packet.getLength());
                 System.out.println("Received message: " + received);
 
                 JSONObject message = new JSONObject(received);
                 processReceivedMessage(message);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -175,6 +176,7 @@ public class MCP {
                 sendInitiationAck(ccpId);
                 break;
             case "STAT": // CCP Status Update
+            case "STRQ": // CCP heartbeat
                 sendStatusAck(ccpId);
                 break;
             case "FSLOWC":
@@ -198,8 +200,8 @@ public class MCP {
     // Main method for testing all MCP commands
     public static void main(String[] args) {
         try {
-            String ccpIp = "10.20.30.153"; // CCP IP address
-            int ccpPort = 3000;         // CCP Port
+            String ccpIp = args.length > 0 ? args[0] : "127.0.0.1";
+            int ccpPort = args.length > 1 ? Integer.parseInt(args[1]) : 3000;
             String ccpId = "BR12";      // Blade Runner ID
 
             MCP mcp = new MCP(ccpIp, ccpPort);

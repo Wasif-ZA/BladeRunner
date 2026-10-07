@@ -42,14 +42,14 @@ const ProjectStructure: React.FC = () => {
               <File name="espcode.ino" type="cpp" />
             </Folder>
 
-            <Folder name="website" desc="Next.js Dashboard">
+            <Folder name="website/code" desc="Next.js Dashboard">
               <File name="src/app/page.tsx" type="react" />
               <File name="tailwind.config.ts" type="ts" />
             </Folder>
 
-            <Folder name="DOCs" desc="System Archives">
-              <File name="MethodDocs.md" type="md" />
-              <File name="Design_Document.docx" type="doc" />
+            <Folder name="docs" desc="System Archives">
+              <File name="ARCHITECTURE.md" type="md" />
+              <File name="legacy/MethodDocs.md" type="md" />
             </Folder>
 
             <Folder name=".vscode" desc="Config">

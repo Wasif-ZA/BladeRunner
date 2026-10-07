@@ -41,8 +41,8 @@ const BladeRunnerPage: React.FC = () => {
                 </h2>
                 <div className="h-1 w-24 bg-cyan-500/50 mx-auto mb-6 rounded-full" />
                 <p className="text-neutral-400 max-w-2xl mx-auto font-light text-lg">
-                  Interactive interface for the <span className="text-cyan-400 font-mono">CCP Java Client</span>.
-                  Initialize the UDP Uplink below to observe real-time state transitions and packet handling.
+                  An in-browser model of the <span className="text-cyan-400 font-mono">CCP.java</span> state machine.
+                  It opens no network connection; run the Java CCP and MCP locally to see real UDP traffic.
                 </p>
               </div>
 

@@ -23,6 +23,7 @@ public class CCP {
     private boolean isLEDFlashing; // Simulates LED flashing state
     private InetAddress espAddress;  // IP address for ESP32
     private int espPort;  // Port for ESP32
+    private int espListenPort;  // Local port CCP listens on for ESP32 messages
     private int sequenceNumbers;  // Sequence number for messages
     private boolean areDoorsOpen = false; // Track if doors are open
     private ExecutorService espListenerExecutor; // Executor for ESP32 listener
@@ -31,7 +32,7 @@ public class CCP {
 
     public CCP(String bladeRunnerId, String mcpAddress, int mcpPort,
                String ccpAddress, int ccpPort, String espIp, int espPort,
-               int sequenceNumber) throws Exception {
+               int espListenPort, int sequenceNumber) throws Exception {
         this.bladeRunnerId = bladeRunnerId;
         this.stateManager = new StateManager();
         this.commHandler = new UDPCommunicationHandler(mcpAddress, mcpPort,
@@ -44,6 +45,7 @@ public class CCP {
         this.sequenceNumbers = sequenceNumber;
         this.espAddress = InetAddress.getByName(espIp);
         this.espPort = espPort;
+        this.espListenPort = espListenPort;
         this.espListenerExecutor = Executors.newSingleThreadExecutor();
 
         // Initially, CCP is in the STARTED state
@@ -71,7 +73,7 @@ public class CCP {
         espListenerExecutor.submit(() -> {
             DatagramSocket socket = null;
             try {
-                socket = new DatagramSocket(espPort);
+                socket = new DatagramSocket(espListenPort);
                 byte[] buffer = new byte[1024];
     
                 while (true) {
@@ -79,8 +81,11 @@ public class CCP {
                     socket.receive(packet);
                     String message = new String(packet.getData(), 0, packet.getLength());
     
-                    // Process the received JSON message
-                    onMessageReceivedFromESP32(message);
+                    try {
+                        onMessageReceivedFromESP32(message);
+                    } catch (RuntimeException e) {
+                        System.err.println("Dropped bad ESP32 message: " + e.getMessage());
+                    }
                 }
             } catch (IOException e) {
                 System.err.println("Error receiving message from ESP32: " + e.getMessage());
@@ -142,8 +147,19 @@ private void onMessageReceived(String message) {
     System.out.println(JSONProcessor.decodeMessage(message));
     processMCPAction(message);
     updateCarriageDetection(message);
-    checkCarriagePositions(); // Check for nearby carriages after receiving a message
+    StateManager.CCPState state = stateManager.getCurrentState();
+    if (state == StateManager.CCPState.FULL_SPEED || state == StateManager.CCPState.MAINTAINING_PACE) {
+        checkCarriagePositions();
+    }
 }
+
+    public StateManager.CCPState getState() {
+        return stateManager.getCurrentState();
+    }
+
+    public boolean areDoorsOpen() {
+        return areDoorsOpen;
+    }
 
 
     // Method to process MCP actions
@@ -268,14 +284,14 @@ private void onMessageReceived(String message) {
     // Method to stop and close doors
     private void stopAndCloseDoors() {
         System.out.println("BR stopping and closing doors.");
-        if (!areDoorsOpen) {
-            System.out.println("Doors are already closed.");
-            return; // Exit if the doors are already closed
-        }
         if (stateManager.getCurrentState() != StateManager.CCPState.STOPPED) {
             System.out.println("Blade Runner is now stopped.");
             stateManager.updateState(StateManager.CCPState.STOPPED);
             updateLEDState();
+        }
+        if (!areDoorsOpen) {
+            System.out.println("Doors are already closed.");
+            return;
         }
         System.out.println("Doors are now closed.");
         areDoorsOpen = false; // Update door status
@@ -284,14 +300,14 @@ private void onMessageReceived(String message) {
     // Method to stop and open doors
     private void stopAndOpenDoors() {
         System.out.println("BR stopping and opening doors.");
-        if (areDoorsOpen) {
-            System.out.println("Doors are already open.");
-            return; // Exit if the doors are already open
-        }
         if (stateManager.getCurrentState() != StateManager.CCPState.STOPPED) {
             System.out.println("Blade Runner is now stopped.");
             stateManager.updateState(StateManager.CCPState.STOPPED);
             updateLEDState();
+        }
+        if (areDoorsOpen) {
+            System.out.println("Doors are already open.");
+            return;
         }
         System.out.println("Doors are now open.");
         areDoorsOpen = true; // Update door status
@@ -491,11 +507,7 @@ private void onMessageReceived(String message) {
             // Log the status message before sending
             System.out.println("Sending status to ESP32: " + statusMessage.toString());
 
-            // Send status to ESP32
-            sendMessageToESP(statusMessage.toString());
-
-            // Wait for acknowledgment from ESP32 with a timeout
-            String ack = waitForAcknowledgment();
+            String ack = sendAndWaitForAcknowledgment(statusMessage.toString());
             if ("ACK".equals(ack)) {
                 System.out.println("ESP32 acknowledged the status.");
             } else {
@@ -506,19 +518,20 @@ private void onMessageReceived(String message) {
         }
     }
 
-    // Method to wait for acknowledgment from ESP32
-    private String waitForAcknowledgment() throws IOException {
+    // Sends to ESP32 and waits on the same socket, since the ESP replies to the sender's port
+    private String sendAndWaitForAcknowledgment(String payload) throws IOException {
         byte[] buffer = new byte[1024];
-        DatagramSocket socket = new DatagramSocket(espPort);  // Port used to listen for acknowledgment
+        DatagramSocket socket = new DatagramSocket();
         socket.setSoTimeout(5000);  // Timeout after 5 seconds (5000 ms)
 
         try {
+            byte[] out = payload.getBytes();
+            socket.send(new DatagramPacket(out, out.length, espAddress, espPort));
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             socket.receive(packet);  // This will block until a message is received or timeout occurs
-            String message = new String(packet.getData(), 0, packet.getLength());
+            String message = new String(packet.getData(), 0, packet.getLength()).trim();
 
-            // Assume acknowledgment message is "ACK"
-            if ("ACK".equals(message)) {
+            if (isAck(message)) {
                 return "ACK";
             } else {
                 System.err.println("Unexpected acknowledgment message: " + message);
@@ -529,6 +542,18 @@ private void onMessageReceived(String message) {
             return "NO_ACK";  // Return "NO_ACK" if timeout occurs
         } finally {
             socket.close();
+        }
+    }
+
+    // Accepts a raw "ACK" or a JSON {"message":"ACK"}
+    static boolean isAck(String message) {
+        if ("ACK".equals(message)) {
+            return true;
+        }
+        try {
+            return "ACK".equals(new JSONObject(message).optString("message", null));
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -544,25 +569,27 @@ private void onMessageReceived(String message) {
         // Simulate turning off IR LED
     }
 
+    static String arg(String[] args, int i, String fallback) {
+        return args.length > i ? args[i] : fallback;
+    }
+
     // Main method
     public static void main(String[] args) {
         try {
-            // Initialize the CCP with the specified values
+            // Args: mcpHost mcpPort ccpHost ccpPort espHost espPort espListenPort (defaults: local simulation)
             String bladeRunnerId = "BR12";
-            //MCP 
-            String mcpAddress = "10.20.30.187";
-            int mcpPort = 3012;
-            //CCP RECEIVE
-            String ccpAddress = "10.20.30.153";
-            int ccpPort = 3000;
-            //ESP
-            String espIp = "10.20.30.112";
-            int espPort = 3012;
+            String mcpAddress = arg(args, 0, "127.0.0.1");
+            int mcpPort = Integer.parseInt(arg(args, 1, "2000"));
+            String ccpAddress = arg(args, 2, "127.0.0.1");
+            int ccpPort = Integer.parseInt(arg(args, 3, "3000"));
+            String espIp = arg(args, 4, "127.0.0.1");
+            int espPort = Integer.parseInt(arg(args, 5, "3001"));
+            int espListenPort = Integer.parseInt(arg(args, 6, "3002"));
             int sequenceNumber = 1;
-    
+
             CCP ccp = new CCP(
                     bladeRunnerId, mcpAddress, mcpPort,
-                    ccpAddress, ccpPort, espIp, espPort, sequenceNumber);
+                    ccpAddress, ccpPort, espIp, espPort, espListenPort, sequenceNumber);
                     
             ccp.connect();
     

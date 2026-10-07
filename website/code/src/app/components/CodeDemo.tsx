@@ -62,7 +62,7 @@ const CodeDemo: React.FC = () => {
         if (state !== 'STARTED') {
             const interval = setInterval(() => {
                 addLog("HB_PING: { \"msg\": \"STRQ\", \"id\": \"BR12\" }", 'tx');
-            }, 4000);
+            }, 2000);
             return () => clearInterval(interval);
         }
     }, [state]);

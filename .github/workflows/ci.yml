@@ -35,3 +35,22 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  java:
+    name: Java CCP checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Compile
+        run: javac -d out -cp CCP/lib/json-20240303.jar CCP/*.java
+
+      - name: Self-test
+        run: java -cp "out:CCP/lib/json-20240303.jar" CCP.CCPSelfTest
